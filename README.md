@@ -1,7 +1,5 @@
 # FirstWatch
 
-> **Tell me what is starting to matter before it becomes obvious.**
-
 FirstWatch is a market watchlist platform designed to help users understand **what is changing around the companies and themes they care about, and whether the market has started reacting to it.**
 
 Instead of continuously scanning information about every company, users build their own watchlist by adding **companies or broader themes** they are interested in — such as solar power, oil, pharmaceuticals, battery storage, or sustainable energy.
@@ -17,19 +15,6 @@ A development and a subsequent market movement are **not automatically treated a
 
 ---
 
-## Why FirstWatch?
-
-A traditional watchlist can tell you what a stock is doing.
-
-It does not necessarily tell you **what happened that might explain why attention should be paid to it.**
-
-FirstWatch combines a user-controlled watchlist with information retrieval, structured analysis, evidence, notifications, and independent market tracking.
-
-The goal is simple:
-
-> **Help users identify what deserves their attention.**
-
----
 
 ## Core Experience
 
