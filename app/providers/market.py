@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from app.providers import Quote
 
@@ -41,14 +41,23 @@ class YahooMarketDataProvider:
     def get_quotes(self, ticker: str) -> list[Quote]:
         import httpx
 
-        symbol = ticker.upper()
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        params = {"interval": "1m", "range": "1d"}
         headers = {"User-Agent": "FirstWatch/0.1 (market-intelligence; educational)"}
+        requested_symbol = ticker.upper()
+        symbols = [requested_symbol]
+        if "." not in requested_symbol:
+            symbols.append(f"{requested_symbol}.NS")
+        data = None
         with httpx.Client(timeout=10.0) as client:
-            resp = client.get(url, params=params, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
+            for candidate in symbols:
+                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{candidate}"
+                resp = client.get(url, params={"interval": "1m", "range": "1d"}, headers=headers)
+                if resp.status_code == 404 and candidate != symbols[-1]:
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                break
+        if data is None:
+            raise RuntimeError("no market data")
         result = (data.get("chart") or {}).get("result") or []
         if not result:
             raise RuntimeError("no market data")
@@ -62,9 +71,5 @@ class YahooMarketDataProvider:
             if ts is None or close is None:
                 continue
             observed = datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
-            quotes.append(Quote(symbol, float(close), currency, observed, "yahoo"))
+            quotes.append(Quote(requested_symbol, float(close), currency, observed, "yahoo"))
         return quotes
-
-
-def utcnow_offset(seconds: int) -> datetime:
-    return utcnow() + timedelta(seconds=seconds)
