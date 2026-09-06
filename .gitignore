@@ -1,16 +1,2 @@
-.env
+
 .venv/
-venv/
-__pycache__/
-*.py[cod]
-*.db
-*.sqlite
-tests/_pytest.db
-.pytest_cache/
-.coverage
-htmlcov/
-.idea/
-.vscode/
-*.egg-info/
-dist/
-build/
