@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 
 from app.providers import InformationRecord
-from app.providers.information import is_primary_url, is_trusted_url
+from app.providers.information import host_of, is_primary_url, is_safe_external_url, is_trusted_url
 
 UNTRUSTED_REJECT = "untrusted_or_incomplete"
 
@@ -30,7 +30,11 @@ def validate_record(rec: InformationRecord) -> str | None:
         return None
     if rec.canonical_id.startswith("mock-"):
         return None
-    if not is_trusted_url(rec.url) and rec.source not in {"BBC", "Reuters", "AP", "FT", "Bloomberg", "CNBC", "WSJ"}:
+    source_host = rec.source.strip().lower().removeprefix("www.")
+    url_host = host_of(rec.url).removeprefix("www.")
+    if not is_trusted_url(rec.url) and (
+        not is_safe_external_url(rec.url) or source_host != url_host
+    ):
         return UNTRUSTED_REJECT
     return None
 

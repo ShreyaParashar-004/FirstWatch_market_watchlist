@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./watch.db"
     access_token_expire_minutes: int = 60 * 24 * 7
 
-    market_data_provider: str = "mock"
-    information_provider: str = "mock"
+    market_data_provider: str = "yahoo"
+    information_provider: str = "google_news"
     ai_provider: str = "mock"
 
     change_threshold_pct: float = 2.0
@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str = "https://api.openai.com/v1"
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-20b"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
 
 
 @lru_cache

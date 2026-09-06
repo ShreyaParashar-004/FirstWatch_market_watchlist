@@ -3,7 +3,7 @@ from datetime import timedelta
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import InformationItem, WatchlistCompany, WatchlistTheme
+from app.models import InformationItem, MarketObservation, WatchlistCompany, WatchlistTheme
 from app.providers import InformationRecord
 from app.providers.factory import get_information_provider, get_market_provider
 from app.providers.market import utcnow
@@ -25,9 +25,25 @@ def refresh_market_for_user(db: Session, user_id: int, ticker: str | None = None
     failed: list[str] = []
     for t in targets:
         try:
-            quote = provider.get_quote(t)
-            store_observation(db, quote.ticker, quote.price, quote.currency, quote.observed_at, quote.source)
-            stored += 1
+            is_batch = hasattr(provider, "get_quotes")
+            before = (
+                db.query(MarketObservation)
+                .filter(MarketObservation.ticker == t.upper())
+                .count()
+                if is_batch
+                else 0
+            )
+            quotes = provider.get_quotes(t) if is_batch else [provider.get_quote(t)]
+            for quote in quotes:
+                store_observation(db, quote.ticker, quote.price, quote.currency, quote.observed_at, quote.source)
+            stored += (
+                db.query(MarketObservation)
+                .filter(MarketObservation.ticker == t.upper())
+                .count()
+                - before
+                if is_batch
+                else 1
+            )
         except Exception:
             failed.append(t)
     ok = stored > 0 or not targets

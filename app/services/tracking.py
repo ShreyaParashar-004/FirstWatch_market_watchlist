@@ -20,24 +20,41 @@ def _status(latest: MarketObservation | None, provider_ok: bool, stale_after: in
 
 def list_window(db: Session, ticker: str, window_hours: int) -> list[MarketObservation]:
     start = utcnow() - timedelta(hours=window_hours)
-    return (
-        db.query(MarketObservation)
-        .filter(MarketObservation.ticker == ticker.upper(), MarketObservation.observed_at >= start)
-        .order_by(MarketObservation.observed_at.asc())
-        .all()
+    query = db.query(MarketObservation).filter(
+        MarketObservation.ticker == ticker.upper(),
+        MarketObservation.observed_at >= start,
     )
+    if get_settings().market_data_provider.lower() != "mock":
+        query = query.filter(MarketObservation.source != "mock")
+    return query.order_by(MarketObservation.observed_at.asc()).all()
 
 
 def latest_observation(db: Session, ticker: str) -> MarketObservation | None:
-    return (
-        db.query(MarketObservation)
-        .filter(MarketObservation.ticker == ticker.upper())
-        .order_by(MarketObservation.observed_at.desc(), MarketObservation.id.desc())
-        .first()
-    )
+    query = db.query(MarketObservation).filter(MarketObservation.ticker == ticker.upper())
+    if get_settings().market_data_provider.lower() != "mock":
+        query = query.filter(MarketObservation.source != "mock")
+    return query.order_by(MarketObservation.observed_at.desc(), MarketObservation.id.desc()).first()
 
 
 def store_observation(db: Session, ticker: str, price: float, currency: str, observed_at: datetime, source: str) -> MarketObservation:
+    if source == "yahoo":
+        observed_at = observed_at.replace(second=0, microsecond=0)
+    existing = (
+        db.query(MarketObservation)
+        .filter(
+            MarketObservation.ticker == ticker.upper(),
+            MarketObservation.observed_at == observed_at,
+            MarketObservation.source == source,
+        )
+        .first()
+    )
+    if existing:
+        existing.price = price
+        existing.currency = currency
+        existing.retrieved_at = utcnow()
+        db.commit()
+        db.refresh(existing)
+        return existing
     row = MarketObservation(
         ticker=ticker.upper(),
         price=price,

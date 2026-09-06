@@ -124,5 +124,14 @@ class RefreshResult(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class NotificationOut(BaseModel):
+    id: int
+    signal_id: int
+    title: str
+    watch_label: str
+    created_at: datetime
+    read_at: datetime | None
+
+
 class ErrorResponse(BaseModel):
     detail: str

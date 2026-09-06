@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.db import Base
-from app.routers import auth, health, signals, tracking, watchlist
+from app.routers import auth, health, notifications, signals, tracking, watchlist
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     application.include_router(watchlist.router)
     application.include_router(tracking.router)
     application.include_router(signals.router)
+    application.include_router(notifications.router)
     return application
 
 

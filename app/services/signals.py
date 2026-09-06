@@ -1,11 +1,12 @@
 import json
+import re
 from collections import defaultdict
 from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import InformationItem, Signal, WatchlistCompany
+from app.models import InformationItem, Notification, Signal, WatchlistCompany
 from app.providers import AnalysisResult, InformationRecord
 from app.providers.factory import get_ai_provider
 from app.providers.market import utcnow
@@ -13,6 +14,29 @@ from app.services.confidence import agreement_from_directions, compute_confidenc
 from app.services.matching import Match
 from app.services.normalize import content_hash
 from app.services.tracking import build_tracking_response, user_owns_ticker
+
+MAX_AI_EVIDENCE = 20
+MAX_SIGNAL_EVIDENCE = 5
+
+
+def _select_signal_evidence(records: list[InformationRecord]) -> list[InformationRecord]:
+    """Keep recent, distinct records for AI and the public signal."""
+    ranked = sorted(
+        records,
+        key=lambda record: record.published_at or datetime.min,
+        reverse=True,
+    )
+    selected: list[InformationRecord] = []
+    seen_titles: set[str] = set()
+    for record in ranked:
+        title_key = re.sub(r"[^a-z0-9]+", " ", record.title.lower()).strip()
+        if title_key in seen_titles:
+            continue
+        seen_titles.add(title_key)
+        selected.append(record)
+        if len(selected) == MAX_SIGNAL_EVIDENCE:
+            break
+    return selected
 
 
 def persist_information(db: Session, records: list[InformationRecord]) -> list[InformationItem]:
@@ -62,7 +86,7 @@ def _evidence_payload(records: list[InformationRecord]) -> list[dict]:
 def _analyze(evidence: list[dict], context: dict) -> AnalysisResult:
     provider = get_ai_provider()
     try:
-        return provider.analyze(evidence, context)
+        return provider.analyze(evidence[:MAX_AI_EVIDENCE], context)
     except Exception:
         from app.providers.ai import fallback_analysis
 
@@ -104,7 +128,8 @@ def aggregate_signals(db: Session, user_id: int, matches: list[Match]) -> list[S
             seen.add(r.canonical_id)
             unique_records.append(r)
         persist_information(db, unique_records)
-        evidence = _evidence_payload(unique_records)
+        signal_records = _select_signal_evidence(unique_records)
+        evidence = _evidence_payload(signal_records)
         entities: list[str] = []
         for m in items:
             for e in m.entities:
@@ -134,7 +159,7 @@ def aggregate_signals(db: Session, user_id: int, matches: list[Match]) -> list[S
                 + analysis.reason
             )
             title = f"Confirmed movement: {watch_label}"
-        times = [r.published_at for r in unique_records if r.published_at]
+        times = [r.published_at for r in signal_records if r.published_at]
         first_ts = min(times) if times else None
         last_ts = max(times) if times else None
         ev_public = [
@@ -144,7 +169,7 @@ def aggregate_signals(db: Session, user_id: int, matches: list[Match]) -> list[S
                 "title": r.title,
                 "published_at": r.published_at.isoformat() if r.published_at else None,
             }
-            for r in unique_records
+            for r in signal_records
         ]
         existing = (
             db.query(Signal)
@@ -167,7 +192,7 @@ def aggregate_signals(db: Session, user_id: int, matches: list[Match]) -> list[S
             existing.time_horizon = analysis.time_horizon
             existing.confidence = confidence
             existing.affected_entities = json.dumps(analysis.entities or entities)
-            existing.evidence_count = len(unique_records)
+            existing.evidence_count = len(signal_records)
             existing.evidence_json = json.dumps(ev_public, default=str)
             existing.first_evidence_at = first_ts
             existing.latest_evidence_at = last_ts
@@ -193,7 +218,7 @@ def aggregate_signals(db: Session, user_id: int, matches: list[Match]) -> list[S
                 time_horizon=analysis.time_horizon,
                 confidence=confidence,
                 affected_entities=json.dumps(analysis.entities or entities),
-                evidence_count=len(unique_records),
+                evidence_count=len(signal_records),
                 evidence_json=json.dumps(ev_public, default=str),
                 first_evidence_at=first_ts,
                 latest_evidence_at=last_ts,
@@ -206,5 +231,7 @@ def aggregate_signals(db: Session, user_id: int, matches: list[Match]) -> list[S
             db.add(row)
             db.commit()
             db.refresh(row)
+            db.add(Notification(user_id=user_id, signal_id=row.id))
+            db.commit()
             out.append(row)
     return out

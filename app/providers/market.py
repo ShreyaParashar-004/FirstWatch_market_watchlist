@@ -33,6 +33,12 @@ class YahooMarketDataProvider:
     """Single real market provider. Yahoo public chart endpoint. No API key."""
 
     def get_quote(self, ticker: str) -> Quote:
+        quotes = self.get_quotes(ticker)
+        if not quotes:
+            raise RuntimeError("no market data")
+        return quotes[-1]
+
+    def get_quotes(self, ticker: str) -> list[Quote]:
         import httpx
 
         symbol = ticker.upper()
@@ -46,14 +52,18 @@ class YahooMarketDataProvider:
         result = (data.get("chart") or {}).get("result") or []
         if not result:
             raise RuntimeError("no market data")
-        meta = result[0].get("meta") or {}
-        price = meta.get("regularMarketPrice")
+        chart = result[0]
+        meta = chart.get("meta") or {}
         currency = meta.get("currency") or "USD"
-        ts = meta.get("regularMarketTime")
-        if price is None:
-            raise RuntimeError("no price in payload")
-        observed = datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None) if ts else utcnow()
-        return Quote(symbol, float(price), currency, observed, "yahoo")
+        timestamps = chart.get("timestamp") or []
+        closes = ((chart.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
+        quotes = []
+        for ts, close in zip(timestamps, closes):
+            if ts is None or close is None:
+                continue
+            observed = datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
+            quotes.append(Quote(symbol, float(close), currency, observed, "yahoo"))
+        return quotes
 
 
 def utcnow_offset(seconds: int) -> datetime:

@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/tracking", tags=["tracking"])
 
 @router.get("", response_model=list[TrackingResponse])
 def list_tracking(
-    window_hours: int = Query(24, ge=1, le=24 * 30),
+    window_hours: int = Query(72, ge=1, le=24 * 30),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -24,7 +24,7 @@ def list_tracking(
 @router.get("/{ticker}", response_model=TrackingResponse)
 def get_tracking(
     ticker: str,
-    window_hours: int = Query(24, ge=1, le=24 * 30),
+    window_hours: int = Query(72, ge=1, le=24 * 30),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):

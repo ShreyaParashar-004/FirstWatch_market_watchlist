@@ -17,6 +17,7 @@ class User(Base):
     companies: Mapped[list["WatchlistCompany"]] = relationship(back_populates="user")
     themes: Mapped[list["WatchlistTheme"]] = relationship(back_populates="user")
     signals: Mapped[list["Signal"]] = relationship(back_populates="user")
+    notifications: Mapped[list["Notification"]] = relationship(back_populates="user")
 
 
 class WatchlistCompany(Base):
@@ -101,3 +102,17 @@ class Signal(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped[User] = relationship(back_populates="signals")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    __table_args__ = (UniqueConstraint("user_id", "signal_id", name="uq_notification_signal"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    signal_id: Mapped[int] = mapped_column(ForeignKey("signals.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped[User] = relationship(back_populates="notifications")
+    signal: Mapped[Signal] = relationship()
